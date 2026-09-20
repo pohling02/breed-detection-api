@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
-
+from fastapi.middleware.cors import CORSMiddleware
+from app.database import get_db
 from app.api.predict import router as predict_router
 
 
@@ -10,6 +11,14 @@ app = FastAPI(
     version="1.0.0"
 )
 
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], 
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(
     predict_router,
@@ -71,3 +80,29 @@ def custom_openapi():
 
 
 app.openapi = custom_openapi
+
+@app.get("/api/v1/health/database")
+def database_health():
+    db = get_db()
+
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cursor:
+
+                cursor.execute("SELECT 1")
+
+                result = cursor.fetchone()
+
+        return {
+            "success": True,
+            "database": "connected",
+            "result": result[0]
+        }
+
+    except Exception as e:
+
+        return {
+            "success": False,
+            "database": "disconnected",
+            "error": str(e)
+        }
