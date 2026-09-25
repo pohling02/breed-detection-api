@@ -1,15 +1,58 @@
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 from fastapi.middleware.cors import CORSMiddleware
-from app.database import get_db
+from app.database import get_db, engine, Base 
 from app.api.predict import router as predict_router
+from app.api import predict, keys
+from app.models import api_key
+from app.models import api_usage
+from fastapi import Request, HTTPException
+from fastapi.responses import JSONResponse
 
+
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="PetBreed API",
-    description="AI-powered dog breed detection API",
-    version="1.0.0"
+    description="""
+    A production-ready AI API for detecting pet breeds and extracting color profiles using YOLOv8.
+    
+    ### Core Features
+    * Multi-image consensus processing
+    * Secure API key authentication
+    * 5-requests-per-minute rate limiting
+    """,
+    version="1.0.0",
+    docs_url="/docs", 
+    redoc_url="/redoc"
 )
+
+@app.exception_handler(HTTPException)
+async def custom_http_exception_handler(request: Request, exc: HTTPException):
+    # Convert standard HTTP status codes into readable text codes if desired
+    error_code_map = {
+        400: "BAD_REQUEST",
+        401: "UNAUTHORIZED",
+        403: "FORBIDDEN",
+        404: "NOT_FOUND",
+        422: "VALIDATION_ERROR",
+        429: "RATE_LIMIT_EXCEEDED",
+        500: "INTERNAL_SERVER_ERROR"
+    }
+    
+    code_string = error_code_map.get(exc.status_code, "ERROR")
+
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "success": False,
+            "error": {
+                "code": code_string,
+                "message": exc.detail
+            }
+        }
+    )
 
 
 app.add_middleware(
@@ -24,6 +67,12 @@ app.include_router(
     predict_router,
     prefix="/api/v1",
     tags=["Prediction"]
+)
+
+app.include_router(
+    keys.router, 
+    prefix="/api/v1/keys", 
+    tags=["API Keys"]
 )
 
 

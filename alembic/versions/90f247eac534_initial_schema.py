@@ -1,8 +1,8 @@
-"""add api_usages and prediction_logs tables
+"""Initial schema
 
-Revision ID: 2607b28b33be
-Revises: 1f729b47caa8
-Create Date: 2026-09-21 04:10:40.909483
+Revision ID: 90f247eac534
+Revises: 
+Create Date: 2026-09-25 18:34:33.760104
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '2607b28b33be'
-down_revision: Union[str, Sequence[str], None] = '1f729b47caa8'
+revision: str = '90f247eac534'
+down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
