@@ -1,4 +1,4 @@
-# PetBreed API
+# Breed Detection API
 
 A REST API built with FastAPI that serves a YOLOv8 computer vision model for pet breed classification and color analysis.
 
