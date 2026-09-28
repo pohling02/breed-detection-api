@@ -1,5 +1,6 @@
+import os
 import hashlib
-from fastapi import HTTPException, Security, Depends
+from fastapi import HTTPException, Security, Depends, Header
 from fastapi.security.api_key import APIKeyHeader
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
@@ -12,14 +13,12 @@ from app.models.api_usage import ApiUsage
 api_key_scheme = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 def get_valid_api_key(
-    # FIX 2: Parameter uses the incoming string, Security uses the renamed scheme
     api_key_header: str = Security(api_key_scheme),
     db: Session = Depends(get_db)
 ) -> ApiKey:
+    print(f"=== DEBUG RAW KEY ===: {repr(api_key_header)}", flush=True)
     if not api_key_header:
         raise HTTPException(status_code=401, detail="Missing X-API-Key header")
-    
-    # FIX 3: Restored your original hashing logic and correct column name
     key_hash = hashlib.sha256(api_key_header.encode()).hexdigest()
     
     api_key = db.query(ApiKey).filter(
@@ -29,7 +28,7 @@ def get_valid_api_key(
 
     if not api_key:
         raise HTTPException(status_code=401, detail="This is an invalid API Key !!!!")
-    
+    print(f"=== DEBUG HASH ===: {key_hash}", flush=True)
     return api_key
 
 def verify_rate_limit(

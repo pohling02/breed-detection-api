@@ -1,13 +1,16 @@
-from fastapi import FastAPI
+import os
+
+from fastapi import FastAPI, Depends, Request, HTTPException
 from fastapi.openapi.utils import get_openapi
 from fastapi.middleware.cors import CORSMiddleware
-from app.database import get_db, engine, Base 
-from app.api.predict import router as predict_router
-from app.api import predict, keys
-from app.models import api_key
-from app.models import api_usage
-from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from app.auth import verify_rate_limit
+from app.database import get_db, engine, Base
+from app.api import predict, keys
+from app.models import api_key, api_usage
 
 
 
@@ -64,15 +67,16 @@ app.add_middleware(
 )
 
 app.include_router(
-    predict_router,
+    predict.router,
     prefix="/api/v1",
-    tags=["Prediction"]
+    tags=["Prediction"],
+    dependencies=[Depends(verify_rate_limit)],
 )
-
 app.include_router(
-    keys.router, 
-    prefix="/api/v1/keys", 
-    tags=["API Keys"]
+    keys.router,
+    prefix="/api/v1/keys",
+    tags=["API Keys"],
+    dependencies=[Depends(verify_rate_limit)],
 )
 
 
@@ -102,56 +106,44 @@ def custom_openapi():
         routes=app.routes,
     )
 
-    # Convert FastAPI/Pydantic's OpenAPI 3.1
-    # file representation into the format
-    # Swagger UI expects for file upload controls.
-    request_schema = (
-        schema["paths"]
-        ["/api/v1/predict"]
-        ["post"]
-        ["requestBody"]
-        ["content"]
-        ["multipart/form-data"]
-        ["schema"]
-        ["$ref"]
-    )
-
-    schema_name = request_schema.split("/")[-1]
-
-    files_schema = schema["components"]["schemas"][schema_name]["properties"]["files"]
-
-    files_schema["items"].pop("contentMediaType", None)
-    files_schema["items"]["format"] = "binary"
+    # Patch multipart file upload schema — wrapped so a shape mismatch
+    # here can't silently corrupt the rest of the OpenAPI doc.
+    try:
+        request_schema = (
+            schema["paths"]["/api/v1/predict"]["post"]
+            ["requestBody"]["content"]["multipart/form-data"]["schema"]["$ref"]
+        )
+        schema_name = request_schema.split("/")[-1]
+        files_schema = schema["components"]["schemas"][schema_name]["properties"]["files"]
+        files_schema["items"].pop("contentMediaType", None)
+        files_schema["items"]["format"] = "binary"
+    except (KeyError, TypeError) as e:
+        print(f"WARNING: could not patch file upload schema: {e}", flush=True)
 
     app.openapi_schema = schema
-
     return app.openapi_schema
-
 
 app.openapi = custom_openapi
 
 @app.get("/api/v1/health/database")
-def database_health():
-    db = get_db()
-
+def database_health(db: Session = Depends(get_db)):
     try:
-        with get_connection() as conn:
-            with conn.cursor() as cursor:
-
-                cursor.execute("SELECT 1")
-
-                result = cursor.fetchone()
+        # SQLAlchemy requires wrapping raw SQL strings in text()
+        result = db.execute(text("SELECT 1")).scalar()
 
         return {
             "success": True,
             "database": "connected",
-            "result": result[0]
+            "result": result
         }
 
     except Exception as e:
-
         return {
             "success": False,
             "database": "disconnected",
             "error": str(e)
         }
+
+
+print("=== DEBUG: DATABASE_URL ===", flush=True)
+print(os.getenv("DATABASE_URL"), flush=True)
