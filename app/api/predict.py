@@ -38,7 +38,6 @@ logger = get_logger(__name__)
     1. `individual_results`: Breed and color breakdown for each uploaded image.
     2. `conclusion`: A consolidated final prediction combining data from all images.
     """,
-    tags=["AI Prediction"],
     responses={
         200: {
             "description": "Successful prediction containing breed confidence and color detection.",
